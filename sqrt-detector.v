@@ -18,6 +18,72 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
+
+
+
+module top_module();
+    wire Go,over,reset;
+	 wire[7:0] n,sqrt;
+    sqrt_beh uut (
+		.Go(Go), 
+		.n(n), 
+		.over(over),
+		.reset(reset),
+		.sqrt(sqrt)
+	);
+    test_bench uutd(Go,n,over,reset,sqrt);
+endmodule
+
+
+
+module test_bench(Go,n,over,reset,sqrt);
+  output Go;
+  output[7:0] n;
+  output reset;
+  input[7:0] sqrt;
+  input over;
+	reg[7:0] n;
+	reg Go;
+	wire[7:0] sqrt;
+	reg reset;	
+   integer j,seed; 
+	initial begin
+        seed = 10; // change the initial seed here.
+		j = 0;
+		reset = 1'b1;
+		#1200;
+		reset = 1'b0;
+	end
+
+    always @(j) 
+    begin
+        if(j == 21) // if you want to take 22 inputs
+		    $finish;    
+    end
+
+	/*initial begin
+		clk = 0;
+		forever begin
+			#6;
+			clk = ~clk;
+		end
+	end*/
+	
+	always @(posedge over)
+	begin		
+      #2;
+		n = $random(seed)%256; //input should below 256
+      seed = seed +1;
+		j = j+1;
+	end
+	  
+	always@(posedge over ) begin
+        $display("n = %8b out = %8b\n",n,sqrt);
+	end
+endmodule
+
+
+
 module sqrt_struc(Go,n,over,sqrt);
   input Go,n;
   output[7:0] sqrt;
