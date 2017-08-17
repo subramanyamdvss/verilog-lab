@@ -1,7 +1,3 @@
-
-`timescale 1ns / 1ps
-
-
 module top_module();
     wire Go,over,reset;
 	 wire[7:0] n,sqrt;
@@ -32,6 +28,8 @@ module top_module();
 
     test_bench uutd(Go,n,over,reset,sqrt,q,sum,val,B0,fnselect,outwire,Go1,Go2,Go3);
 endmodule
+
+
 
 module test_bench(Go,n,over,reset,sqrt,q,sum,val,B0,fnselect,outwire,Go1,Go2,Go3);
     //you need to add extra debug info.
@@ -75,7 +73,7 @@ module test_bench(Go,n,over,reset,sqrt,q,sum,val,B0,fnselect,outwire,Go1,Go2,Go3
         reset = 1'b0;
 	end
 
-    /*always @(posedge over) 
+    always @(posedge over) 
     begin
             if(over) begin
                 $display("n = %8b sum = %8b val = %8b B0 = %b over = %b\n",n,sum,val,B0,over);                
@@ -83,7 +81,7 @@ module test_bench(Go,n,over,reset,sqrt,q,sum,val,B0,fnselect,outwire,Go1,Go2,Go3
                 
             end
 		            
-    end*/
+    end
 
 	initial begin
 		
@@ -129,9 +127,9 @@ module test_bench(Go,n,over,reset,sqrt,q,sum,val,B0,fnselect,outwire,Go1,Go2,Go3
       seed = seed +1;
 		j = j+1;
 	end*/
-	always@(over) begin
+	always@(sum,val,q,sqrt,B0) begin
         
-        $display("q = %9b sum = %8b val = %8b B0 = %b out=%8b fnselect = %6b aluz = %8b",q,sum,val,over,sqrt,fnselect,outwire);
+        $display("q = %9b sum = %8b val = %8b B0 = %b out=%8b fnselect = %6b aluz = %8b",q,sum,val,B0,sqrt,fnselect,outwire);
     end
 	
 endmodule
@@ -178,8 +176,8 @@ module control(Go,B0,over,TSW,ldsqrt,Tsqrt,ldsum,ldval,Tsum,Tval,fnselect,reset,
 	 assign Tval = q[3]|q[5]|q[7];
 	 assign Tsum = q[3]|q[4]|q[7];
 	 assign tmp = Go || B0;
-	 always@(posedge Go or posedge B0 ) begin
-		 if(reset|q[8]) begin
+	 always@(posedge tmp or posedge reset) begin
+		 if(reset) begin
 			//initialize the state register
 			q<=9'b000000001;
 			fnselect <= 6'b000001;
@@ -215,12 +213,10 @@ module control(Go,B0,over,TSW,ldsqrt,Tsqrt,ldsum,ldval,Tsum,Tval,fnselect,reset,
 		 else begin if(q[4]) begin
 			
 			if(B0) begin
-                over<=1;
 				q <= q << 4;
 				fnselect <= 6'b000001; 
 			end
 			else begin
-                
 				q <= q << 1;
                 fnselect <= 6'b010000; 
 			end
@@ -233,12 +229,11 @@ module control(Go,B0,over,TSW,ldsqrt,Tsqrt,ldsum,ldval,Tsum,Tval,fnselect,reset,
 			fnselect <= 6'b000010; 
 			q <= q << 1;
 		 end
-		
-        else begin
-            over<=0;
-            q <= 9'b000000001;
-            fnselect <= 6'b000001; 
-        
+		else  begin
+			//q[8]
+			over <=1;
+			q <= 9'b000000001;
+			
 		end
 		
 	 end
@@ -262,22 +257,19 @@ module datapath(n,TSW,ldsqrt,Tsqrt,ldsum,Tsum,ldval,Tval,fnselect,B0,sqrt,sum,va
     output B0;
 	 output[7:0] sqrt;
     output[7:0] sum,val,outwire;
-    reg B0;
+    
     reg[7:0] sqrt,sum,val;
     wire[7:0] outwire;
-	 wire[7:0] X,Y;
-    integer i;
-    ALU alu(.x(X),.y(Y),.z(outwire),.fnselect(fnselect),.Go2(Go2));
+	 reg[7:0] X,Y;
+    ALU alu(.x(X),.y(Y),.z(outwire),.fnselect(fnselect),.B0(B0),.Go2(Go2));
     //code for loading info into registers
 	 //ldsqrt,ldsum,ldval,TSW ,Tsqrt , Tsum , Tval
 	 //first the alu calculation should be done then the assignment should be done.
-    for(i = 0;i<8;i = i+1) begin
-        bufif1 nld(X[i],n[i],TSW[i]);
-        bufif1 valld(X[i],val[i],Tval[i]);
-        bufif1 sumld(Y[i],sum[i],Tsum[i]);
-        bufif1 sqrtld(Y[i],sqrt[i],Tsqrt[i]);
-    end
-    /*always@(posedge Go1) begin
+    
+     
+
+
+    always@(posedge Go1) begin
          if (TSW) begin
 			  X <= n; 
 		 end
@@ -299,23 +291,20 @@ module datapath(n,TSW,ldsqrt,Tsqrt,ldsum,Tsum,ldval,Tval,fnselect,B0,sqrt,sum,va
          
          end
          end
-    end*/   
+    end
 
 	
     always@ (posedge Go3)
     begin
         if(ldsqrt) begin
             sqrt <= outwire;
-            B0 <= outwire[7];
         end
    
         else begin if(ldsum) begin
             sum <= outwire;
-            B0 <= outwire[7];
         end
         else begin if(ldval) begin
             val <= outwire;
-            B0 <= outwire[7];
         end
 		else begin
             sqrt<=sqrt;
@@ -330,7 +319,7 @@ endmodule
 
 
 
-module ALU(x,y,z,fnselect,Go2);
+module ALU(x,y,z,fnselect,B0,Go2);
     //the functions used are 
 	 // i) zero ii) add iii) sub iv) keeping outwire as a constant value v) increment by const 2 vi) increment by const 1 
 	 // v) can be implemented by keeping Y as constant value and fnselect as ii)
@@ -340,8 +329,10 @@ module ALU(x,y,z,fnselect,Go2);
 	 input[7:0] x,y;
 	 input Go2;
 	 input[5:0] fnselect;
+	 output B0;
 	 output [7:0] z;
 	 reg[7:0] z;
+     reg B0;
      
 	 always@(posedge Go2) begin
 		 if(fnselect[1])begin
@@ -349,7 +340,7 @@ module ALU(x,y,z,fnselect,Go2);
 		 end
 		 else begin if(fnselect[2])begin
 			z <= x-y;
-            
+            B0 <= z[7];
 		 end
 		 else begin if(fnselect[0]) begin
            
